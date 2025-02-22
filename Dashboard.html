@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nixus - Dashboard</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        button {
+            background-color: #6a0dad;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #530a91;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="home">
+        <h1>Bienvenue sur le Dashboard de Nixus</h1>
+        <p>Connectez-vous pour gérer vos serveurs.</p>
+        <button onclick="loginWithDiscord()">🔑 Connexion avec Discord</button>
+        <button onclick="inviteBot()">➕ Ajouter à un serveur</button>
+    </div>
+
+    <div class="container hidden" id="dashboard">
+        <h1>📊 Dashboard - Gestion du bot</h1>
+        <p>Bienvenue, <span id="username"></span> ! Sélectionnez un serveur pour configurer Nixus.</p>
+        <select id="serverList"></select>
+        <button onclick="logout()">🚪 Déconnexion</button>
+    </div>
+
+    <div class="container hidden" id="error">
+        <h1>⚠️ Accès refusé</h1>
+        <p>Vous n'avez pas l'autorisation d'accéder à ce dashboard.</p>
+        <button onclick="logout()">Retour</button>
+    </div>
+
+    <script>
+        const CLIENT_ID = "1318018320150171739"; // ID du bot
+        const REDIRECT_URI = window.location.origin + "/"; // Redirection vers la même page
+
+        function loginWithDiscord() {
+            const oauthUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=identify%20guilds`;
+            window.location.href = oauthUrl;
+        }
+
+        function inviteBot() {
+            window.location.href = "https://discord.com/oauth2/authorize?client_id=1318018320150171739&permissions=8&scope=bot";
+        }
+
+        function logout() {
+            localStorage.removeItem("discord_user");
+            localStorage.removeItem("discord_token");
+            window.location.reload();
+        }
+
+        async function fetchDiscordData(token) {
+            try {
+                const userResponse = await fetch("https://discord.com/api/users/@me", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const userData = await userResponse.json();
+                localStorage.setItem("discord_user", JSON.stringify(userData));
+
+                const guildResponse = await fetch("https://discord.com/api/users/@me/guilds", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const guildData = await guildResponse.json();
+                
+                localStorage.setItem("discord_guilds", JSON.stringify(guildData));
+                showDashboard(userData, guildData);
+            } catch (error) {
+                console.error("Erreur lors de la récupération des données Discord:", error);
+            }
+        }
+
+        function showDashboard(user, guilds) {
+            document.getElementById("home").classList.add("hidden");
+            document.getElementById("dashboard").classList.remove("hidden");
+            document.getElementById("username").innerText = user.username;
+
+            const serverList = document.getElementById("serverList");
+            serverList.innerHTML = "";
+
+            guilds.forEach(guild => {
+                let option = document.createElement("option");
+                option.value = guild.id;
+                option.textContent = guild.name;
+                serverList.appendChild(option);
+            });
+        }
+
+        function checkLogin() {
+            const fragment = new URLSearchParams(window.location.hash.substring(1));
+            const token = fragment.get("access_token");
+
+            if (token) {
+                localStorage.setItem("discord_token", token);
+                fetchDiscordData(token);
+            } else {
+                const storedUser = localStorage.getItem("discord_user");
+                const storedToken = localStorage.getItem("discord_token");
+
+                if (storedUser && storedToken) {
+                    fetchDiscordData(storedToken);
+                }
+            }
+        }
+
+        checkLogin();
+    </script>
+
+</body>
+</html>
